@@ -1,0 +1,14 @@
+[Unit]
+Description=AUREUS USB Audio Class 2 gadget
+After=sys-kernel-config.mount systemd-modules-load.service
+Before=aureus-dsp.service
+ConditionPathExists=/sys/kernel/config
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aureus-usb-gadget
+ExecStop=/usr/local/bin/aureus-usb-gadget stop
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

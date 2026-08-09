@@ -1,0 +1,23 @@
+# METABEGIN
+# X-Env-Layer-Name: aureus-dsp
+# X-Env-Layer-Description: AUREUS DSP V1 USB UAC2 to CamillaDSP appliance
+# X-Env-Layer-Category: general
+# X-Env-Layer-Version: 1.0.0
+# X-Env-Layer-Requires: trixie-minbase
+# METAEND
+
+mmdebstrap:
+  packages:
+    - alsa-utils
+    - ca-certificates
+    - curl
+    - kmod
+    - python3
+    - python3-yaml
+    - python3-pygame
+    - libasound2
+    - libdrm2
+    - udev
+    - util-linux
+    - procps
+    - file

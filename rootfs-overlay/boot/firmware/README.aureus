@@ -1,0 +1,1 @@
+Boot partition is patched by build-image.sh with dtoverlay=dwc2,dr_mode=peripheral.

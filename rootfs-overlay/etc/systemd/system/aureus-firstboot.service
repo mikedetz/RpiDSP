@@ -1,0 +1,12 @@
+[Unit]
+Description=AUREUS first boot setup
+After=local-fs.target
+Before=aureus-usb-gadget.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aureus-firstboot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

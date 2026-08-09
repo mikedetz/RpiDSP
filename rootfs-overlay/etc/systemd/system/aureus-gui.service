@@ -1,0 +1,19 @@
+[Unit]
+Description=AUREUS HDMI status display
+After=graphical.target aureus-dsp.service
+Wants=aureus-dsp.service
+
+[Service]
+Type=simple
+Environment=SDL_VIDEODRIVER=kmsdrm
+Environment=SDL_AUDIODRIVER=dummy
+ExecStart=/usr/local/bin/aureus-gui
+Restart=always
+RestartSec=2
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

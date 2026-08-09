@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+install -d -m 0755 /var/lib/aureus /var/log/aureus
+touch /var/lib/aureus/firstboot-complete

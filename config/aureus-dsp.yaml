@@ -1,0 +1,14 @@
+# AUREUS DSP V1 build configuration
+include:
+  file: trixie-minbase.yaml
+
+device:
+  layer: rpi4
+  storage_type: sd
+
+image:
+  layer: image-rpios
+  compression: none
+
+layer:
+  aureus: aureus-dsp

@@ -1,0 +1,2 @@
+#!/bin/sh
+cat /run/aureus/status 2>/dev/null || echo "state=WAITING"
