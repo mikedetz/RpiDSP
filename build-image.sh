@@ -11,11 +11,17 @@ CAMILLADSP_VERSION="${CAMILLADSP_VERSION:-4.1.3}"
 
 mkdir -p "$BUILD" "$OUT"
 
-if [ "$(uname -m)" != "aarch64" ]; then
-    echo "ERROR: build must run on a 64-bit ARM64/Linux host."
-    echo "Detected: $(uname -m)"
-    exit 1
-fi
+ARCH="$(uname -m)"
+
+case "$ARCH" in
+    x86_64|aarch64)
+        echo "Build host: $ARCH"
+        ;;
+    *)
+        echo "ERROR: unsupported build host architecture: $ARCH"
+        exit 1
+        ;;
+esac
 
 if [ ! -x "$RPIIG/rpi-image-gen" ]; then
     echo "Installing rpi-image-gen ${RPIIG_TAG}..."
