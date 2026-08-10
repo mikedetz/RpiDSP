@@ -1,134 +1,136 @@
 #!/usr/bin/env python3
-import os, re, subprocess, time, signal, sys
+
+import os
+import re
+import signal
+import subprocess
+import time
 from pathlib import Path
 
-STATE = Path("/run/aureus")
-STATE.mkdir(parents=True, exist_ok=True)
-STATUS = STATE / "status"
-CONF = STATE / "camilla.yml"
-LOG = Path("/var/log/aureus/camilladsp.log")
-RATES = [44100,48000,88200,96000,176400,192000,352800,384000,705600,768000]
+CAMILLADSP = "/usr/local/bin/camilladsp"
+CONFIG_DIR = Path("/usr/local/share/aureus/configs")
 
-def cards(cmd):
-    p = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    return p.stdout
+RATES = [
+    44100,
+    48000,
+    88200,
+    96000,
+    176400,
+    192000,
+    352800,
+    384000,
+    705600,
+    768000,
+]
 
-def find_capture():
-    out = cards(["arecord","-l"])
-    m = re.search(r"card\s+(\d+):\s*([^\s\[]+)", out)
-    if not m: return None
-    return m.group(2)
+current_rate = None
+process = None
 
-def find_playback():
-    out = cards(["aplay","-l"])
-    # Prefer XMOS / EVO / USB devices.
-    for pat in [r"card\s+\d+:\s*([^\s\[]*(?:EVO|XMOS|USB)[^\s\[]*)", r"card\s+(\d+):\s*([^\s\[]+)"]:
-        m = re.search(pat, out, re.I)
-        if m: return m.group(1)
-    return None
 
-def active_rate(card):
-    # ALSA hw_params is populated while Windows has opened the gadget stream.
-    base = Path("/proc/asound")
-    for p in base.glob("card*/pcm*c/sub*/hw_params"):
+def detect_rate():
+
+    paths = Path("/proc/asound").glob(
+        "card*/pcm*c/sub*/hw_params"
+    )
+
+    for path in paths:
+
         try:
-            txt = p.read_text()
+            data = path.read_text()
         except Exception:
             continue
-        if "closed" in txt:
+
+        match = re.search(
+            r"rate:\s*(\d+)",
+            data
+        )
+
+        if not match:
             continue
-        m = re.search(r"rate:\s*(\d+)", txt)
-        if m and int(m.group(1)) in RATES:
-            # Prefer the card containing the gadget name.
-            parent = str(p)
-            if card.lower() in parent.lower() or "card" in parent:
-                return int(m.group(1))
+
+        rate = int(match.group(1))
+
+        if rate in RATES:
+            return rate
+
     return None
 
-def write_status(rate=None, volume=-40.0, preset="AUREUS LINEAR 01", state="WAITING"):
-    STATUS.write_text(f"state={state}\nrate={rate or 0}\nvolume={volume:.1f}\npreset={preset}\n")
 
-def make_config(rate, cap, pb):
-    text = f"""devices:
-  samplerate: {rate}
-  chunksize: 512
-  queuelimit: 4
-  silence_threshold: -100
-  silence_timeout: 0
-  target_level: 1024
-  adjust_period: 5
-  enable_rate_adjust: true
-  capture_samplerate: {rate}
-  stop_on_rate_change: true
-  rate_measure_interval: 1.0
-  volume_ramp_time: 300.0
-  volume_limit: 0.0
-  capture:
-    type: Alsa
-    channels: 2
-    device: "hw:{cap}"
-    format: S32_LE
-  playback:
-    type: Alsa
-    channels: 2
-    device: "hw:{pb}"
-    format: S32_LE
+def stop_camilla():
 
-mixers:
-  stereo:
-    channels:
-      in: 2
-      out: 2
-    mapping:
-      - dest: 0
-        sources:
-          - channel: 0
-            gain: 1.0
-      - dest: 1
-        sources:
-          - channel: 1
-            gain: 1.0
+    global process
 
-filters: {{}}
-pipeline:
-  - type: Mixer
-    name: stereo
-"""
-    CONF.write_text(text)
+    if process is None:
+        return
+
+    if process.poll() is None:
+
+        try:
+            process.send_signal(signal.SIGTERM)
+            process.wait(timeout=3)
+
+        except subprocess.TimeoutExpired:
+
+            process.kill()
+
+    process = None
+
+
+def start_camilla(rate):
+
+    global process
+
+    config = CONFIG_DIR / f"pcm-{rate}.yml"
+
+    if not config.exists():
+
+        print(
+            f"No CamillaDSP config for {rate} Hz",
+            flush=True
+        )
+
+        return
+
+    print(
+        f"Starting CamillaDSP at {rate} Hz",
+        flush=True
+    )
+
+    process = subprocess.Popen(
+        [
+            CAMILLADSP,
+            str(config)
+        ],
+        stdout=subprocess.STDOUT,
+        stderr=subprocess.STDOUT
+    )
+
 
 def main():
-    cap = None
-    pb = None
-    proc = None
+
+    global current_rate
+
+    print(
+        "AUREUS DSP runner started",
+        flush=True
+    )
+
     while True:
-        if cap is None:
-            cap = find_capture()
-        if pb is None:
-            pb = find_playback()
 
-        rate = active_rate(cap) if cap else None
-        if not cap or not pb or not rate:
-            write_status(rate, state="WAITING")
-            time.sleep(1)
-            continue
+        rate = detect_rate()
 
-        if proc is None or proc.poll() is not None:
-            make_config(rate, cap, pb)
-            write_status(rate, state="RUNNING")
-            with open(LOG, "a") as log:
-                proc = subprocess.Popen(
-                    ["/usr/local/bin/camilladsp", "--gain=-40.0", str(CONF)],
-                    stdout=log, stderr=subprocess.STDOUT,
-                    start_new_session=True
-                )
-            time.sleep(0.5)
-        else:
-            # CamillaDSP exits when stop_on_rate_change detects a change.
-            if rate and str(rate) not in CONF.read_text(errors="ignore"):
-                proc.terminate()
-                proc.wait(timeout=2)
-                proc = None
-        time.sleep(1)
+        if rate != current_rate:
+
+            stop_camilla()
+
+            current_rate = rate
+
+            if rate is not None:
+
+                start_camilla(rate)
+
+        time.sleep(0.25)
+
 
 if __name__ == "__main__":
     main()
