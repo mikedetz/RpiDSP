@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -e
+
+mkdir -p /etc/aureus
+
+arecord -l > /run/aureus-arecord.txt 2>&1 || true
+aplay -l > /run/aureus-aplay.txt 2>&1 || true
+
+echo "=== CAPTURE ==="
+cat /run/aureus-arecord.txt
+
+echo
+echo "=== PLAYBACK ==="
+cat /run/aureus-aplay.txt
