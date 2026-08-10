@@ -1,56 +1,164 @@
 #!/usr/bin/env python3
-import os, time
+
+import re
+import time
 from pathlib import Path
+
 import pygame
 
-STATUS=Path("/run/aureus/status")
 
-def read_status():
-    d={}
-    try:
-        for line in STATUS.read_text().splitlines():
-            if "=" in line:
-                k,v=line.split("=",1); d[k]=v
-    except Exception:
-        pass
-    return d
+WIDTH = 1280
+HEIGHT = 720
+
+
+def detect_rate():
+
+    for path in Path("/proc/asound").glob(
+        "card*/pcm*c/sub*/hw_params"
+    ):
+
+        try:
+            text = path.read_text()
+        except Exception:
+            continue
+
+        match = re.search(
+            r"rate:\s*(\d+)",
+            text
+        )
+
+        if match:
+            return int(match.group(1))
+
+    return None
+
+
+def format_rate(rate):
+
+    if rate is None:
+        return "---"
+
+    if rate >= 1000:
+        return f"{rate / 1000:.1f}"
+
+    return str(rate)
+
 
 pygame.init()
-info=pygame.display.Info()
-w,h=info.current_w or 1280, info.current_h or 720
-screen=pygame.display.set_mode((w,h), pygame.FULLSCREEN)
-pygame.mouse.set_visible(False)
-clock=pygame.time.Clock()
 
-font_big=pygame.font.Font(None, max(96, int(h*0.18)))
-font_rate=pygame.font.Font(None, max(72, int(h*0.12)))
-font_small=pygame.font.Font(None, max(34, int(h*0.055)))
+info = pygame.display.Info()
+
+width = info.current_w or WIDTH
+height = info.current_h or HEIGHT
+
+screen = pygame.display.set_mode(
+    (width, height),
+    pygame.FULLSCREEN
+)
+
+pygame.mouse.set_visible(False)
+
+font_title = pygame.font.Font(
+    None,
+    64
+)
+
+font_rate = pygame.font.Font(
+    None,
+    180
+)
+
+font_small = pygame.font.Font(
+    None,
+    52
+)
+
+font_preset = pygame.font.Font(
+    None,
+    38
+)
+
+clock = pygame.time.Clock()
+
+
+def draw_center(text, font, y):
+
+    surface = font.render(
+        text,
+        True,
+        (235, 235, 235)
+    )
+
+    x = (
+        width -
+        surface.get_width()
+    ) // 2
+
+    screen.blit(
+        surface,
+        (x, y)
+    )
+
 
 while True:
-    s=read_status()
-    screen.fill((0,0,0))
-    title=font_small.render("AUREUS DSP", True, (210,210,210))
-    screen.blit(title, ((w-title.get_width())//2, int(h*0.10)))
 
-    state=s.get("state","WAITING")
-    rate=s.get("rate","0")
-    if state=="RUNNING" and rate!="0":
-        r=int(rate)
-        label=(f"{r/1000:.1f} kHz" if r%1000 else f"{r//1000} kHz")
-        rs=font_rate.render(label, True, (245,245,245))
-        screen.blit(rs, ((w-rs.get_width())//2, int(h*0.27)))
-        lock=font_small.render("LOCKED", True, (160,160,160))
-        screen.blit(lock, ((w-lock.get_width())//2, int(h*0.42)))
-        vol=font_big.render(f"{s.get('volume','-40.0')} dB", True, (245,245,245))
-        screen.blit(vol, ((w-vol.get_width())//2, int(h*0.52)))
-        preset=font_small.render(s.get("preset","AUREUS LINEAR 01"), True, (190,190,190))
-        screen.blit(preset, ((w-preset.get_width())//2, int(h*0.74)))
-        mode=font_small.render("PCM  •  USB IN → DSP → USB OUT", True, (120,120,120))
-        screen.blit(mode, ((w-mode.get_width())//2, int(h*0.84)))
+    for event in pygame.event.get():
+
+        if event.type == pygame.QUIT:
+            raise SystemExit
+
+    rate = detect_rate()
+
+    screen.fill(
+        (0, 0, 0)
+    )
+
+    draw_center(
+        "AUREUS",
+        font_title,
+        40
+    )
+
+    if rate:
+
+        draw_center(
+            format_rate(rate),
+            font_rate,
+            150
+        )
+
+        draw_center(
+            "kHz",
+            font_small,
+            340
+        )
+
+        draw_center(
+            "LOCKED",
+            font_small,
+            410
+        )
+
     else:
-        msg=font_rate.render("WAITING FOR USB", True, (220,220,220))
-        screen.blit(msg, ((w-msg.get_width())//2, int(h*0.40)))
-        sub=font_small.render("Connect Windows 11 to the USB-C port", True, (130,130,130))
-        screen.blit(sub, ((w-sub.get_width())//2, int(h*0.54)))
+
+        draw_center(
+            "WAITING FOR USB",
+            font_small,
+            300
+        )
+
+    draw_center(
+        "-40.0 dB",
+        font_small,
+        500
+    )
+
+    draw_center(
+        "AUREUS LINEAR 01",
+        font_preset,
+        610
+    )
+
     pygame.display.flip()
+
     clock.tick(10)
