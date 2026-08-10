@@ -1,0 +1,22 @@
+devices:
+  samplerate: 384000
+  chunksize: 256
+  queuelimit: 2
+
+  capture:
+    type: Alsa
+    channels: 2
+    device: "hw:AUREUS"
+    format: S32_LE
+
+  playback:
+    type: Alsa
+    channels: 2
+    device: "hw:EVO_SABRE"
+    format: S32_LE
+
+pipeline:
+  - type: Gain
+    parameters:
+      gain: -40.0
+      inverted: false
