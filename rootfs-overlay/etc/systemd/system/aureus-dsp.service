@@ -1,19 +1,26 @@
 [Unit]
-Description=AUREUS CamillaDSP engine
-Requires=aureus-usb-gadget.service
+Description=AUREUS DSP - CamillaDSP
 After=aureus-usb-gadget.service sound.target
-Wants=sound.target
+Requires=aureus-usb-gadget.service
 
 [Service]
 Type=simple
+
 ExecStart=/usr/local/bin/aureus-dsp-runner
+
 Restart=always
 RestartSec=1
+
 Nice=-10
-IOSchedulingClass=realtime
-IOSchedulingPriority=2
+
 LimitRTPRIO=95
 LimitMEMLOCK=infinity
+
+IOSchedulingClass=realtime
+IOSchedulingPriority=0
+
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=80
 
 [Install]
 WantedBy=multi-user.target
