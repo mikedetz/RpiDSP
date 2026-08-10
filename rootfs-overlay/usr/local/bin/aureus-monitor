@@ -1,0 +1,14 @@
+#!/bin/bash
+
+while true
+do
+
+    if ! systemctl is-active --quiet aureus-dsp.service
+    then
+        logger -t AUREUS-DSP \
+            "CamillaDSP service inactive"
+    fi
+
+    sleep 5
+
+done
